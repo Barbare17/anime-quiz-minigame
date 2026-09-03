@@ -1,0 +1,1170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anime Quiz Arcade</title>
+<meta name="description" content="Play anime character and opening theme quizzes with real artwork and audio.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Dots&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --void:#0a0a14;
+    --panel:#14152a;
+    --panel-2:#1c1e3a;
+    --ink:#f2efe6;
+    --muted:#9491b3;
+    --magenta:#ff2e63;
+    --cyan:#29e0d1;
+    --gold:#ffce54;
+    --line:#33355c;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--void);
+    color:var(--ink);
+    font-family:'Space Grotesk',sans-serif;
+    min-height:100vh;
+    position:relative;
+    overflow-x:hidden;
+  }
+  body::before{
+    content:"";
+    position:fixed;inset:0;
+    background-image:
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.025) 0px, rgba(255,255,255,0.025) 1px, transparent 1px, transparent 3px);
+    pointer-events:none;
+    z-index:1000;
+    mix-blend-mode:overlay;
+  }
+  .grain-glow{
+    position:fixed; top:-20%; left:50%; transform:translateX(-50%);
+    width:1200px; height:800px;
+    background:radial-gradient(ellipse at center, rgba(255,46,99,0.10), transparent 60%);
+    pointer-events:none; z-index:0;
+  }
+  #app{position:relative; z-index:1; max-width:960px; margin:0 auto; padding:28px 20px 80px;}
+
+  /* ---- Top bar / timecode style ---- */
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    border-bottom:2px solid var(--line);
+    padding-bottom:14px; margin-bottom:34px;
+  }
+  .logo{
+    font-family:'Zen Dots',cursive;
+    font-size:20px; letter-spacing:0.5px;
+    color:var(--ink);
+    display:flex; align-items:center; gap:10px;
+  }
+  .logo .dot{width:10px;height:10px;border-radius:50%;background:var(--magenta); box-shadow:0 0 10px var(--magenta); animation:pulse 1.6s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;} 50%{opacity:0.35;}}
+  .tc{
+    font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--muted);
+    border:1px solid var(--line); padding:5px 10px;
+  }
+
+  /* ---- Hero ---- */
+  .hero{margin-bottom:46px;}
+  .hero .eyebrow{
+    font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--cyan);
+    border-left:2px solid var(--cyan); padding-left:10px; margin-bottom:16px;
+  }
+  .hero h1{
+    font-family:'Zen Dots',cursive;
+    font-size:clamp(34px,6vw,58px);
+    line-height:1.08;
+    margin:0 0 18px;
+    max-width:11ch;
+  }
+  .hero p{
+    color:var(--muted); font-size:16px; line-height:1.6; max-width:52ch; margin:0;
+  }
+
+  /* ---- Mode cards ---- */
+  .modes{display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:34px;}
+  @media (max-width:680px){ .modes{grid-template-columns:1fr;} }
+  .mode-card{
+    background:var(--panel);
+    border:2px solid var(--line);
+    padding:26px 24px;
+    cursor:pointer;
+    position:relative;
+    transition:transform .15s ease, border-color .15s ease;
+    box-shadow:6px 6px 0 var(--panel-2);
+  }
+  .mode-card:hover{ transform:translate(-3px,-3px); box-shadow:9px 9px 0 var(--panel-2); }
+  .mode-card.char{ border-color:var(--magenta); }
+  .mode-card.song{ border-color:var(--cyan); }
+  .mode-card .tick{ position:absolute; top:14px; right:16px; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted);}
+  .mode-card h2{ font-family:'Zen Dots',cursive; font-size:20px; margin:6px 0 10px; }
+  .mode-card.char h2{ color:var(--magenta); }
+  .mode-card.song h2{ color:var(--cyan); }
+  .mode-card p{ color:var(--muted); font-size:14px; line-height:1.55; margin:0 0 16px;}
+  .mode-card .count{ font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--ink); }
+
+  /* ---- Setup panel ---- */
+  .panel{ background:var(--panel); border:2px solid var(--line); padding:28px; margin-top:26px; }
+  .panel h3{ font-family:'Zen Dots',cursive; font-size:16px; margin:0 0 18px; }
+  .field{ margin-bottom:22px; }
+  .field label{ display:block; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); margin-bottom:10px; }
+  .chip-row{ display:flex; gap:10px; flex-wrap:wrap; }
+  .chip{
+    border:2px solid var(--line); background:transparent; color:var(--ink);
+    padding:9px 16px; font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:13px;
+    cursor:pointer; transition:all .12s ease;
+  }
+  .chip:hover{ border-color:var(--muted); }
+  .chip.active{ background:var(--ink); color:var(--void); border-color:var(--ink); }
+  .chip.diff-easy.active{ background:#54c98b; border-color:#54c98b; color:#0a0a14;}
+  .chip.diff-medium.active{ background:var(--gold); border-color:var(--gold); color:#0a0a14;}
+  .chip.diff-hard.active{ background:var(--magenta); border-color:var(--magenta); color:#fff;}
+  .chip.diff-mixed.active{ background:var(--cyan); border-color:var(--cyan); color:#0a0a14;}
+  .go-btn{
+    font-family:'Zen Dots',cursive; font-size:15px;
+    background:var(--magenta); color:#fff; border:none;
+    padding:15px 30px; cursor:pointer; margin-top:6px;
+    box-shadow:5px 5px 0 var(--panel-2);
+    transition:transform .12s ease;
+  }
+  .go-btn.song{ background:var(--cyan); color:#0a0a14; }
+  .go-btn:hover{ transform:translate(-2px,-2px); }
+  .go-btn:disabled{ opacity:0.4; cursor:not-allowed; }
+  .back-link{
+    background:none; border:none; color:var(--muted); font-family:'JetBrains Mono',monospace;
+    font-size:12px; cursor:pointer; padding:0; margin-bottom:18px; display:inline-flex; align-items:center; gap:6px;
+  }
+  .back-link:hover{ color:var(--ink); }
+
+  /* ---- Quiz screen ---- */
+  .quiz-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:22px; gap:14px; flex-wrap:wrap;}
+  .stat{ font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--muted); }
+  .stat b{ color:var(--ink); font-size:14px; }
+  .progress-bar{ height:4px; background:var(--panel-2); width:100%; margin-bottom:26px; overflow:hidden;}
+  .progress-fill{ height:100%; background:var(--magenta); transition:width .2s linear;}
+  .progress-fill.song{ background:var(--cyan); }
+  .timer-ring{ font-family:'JetBrains Mono',monospace; font-size:13px; padding:5px 10px; border:1px solid var(--line);}
+  .timer-ring.low{ color:var(--magenta); border-color:var(--magenta); }
+
+  .qcard{ background:var(--panel); border:2px solid var(--line); padding:30px; text-align:center; }
+  .qcard .prompt{ font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--cyan); margin-bottom:18px; }
+  .qcard.char .prompt{ color:var(--magenta); }
+
+  .avatar-wrap{
+    width:min(100%,280px); min-height:350px; margin:0 auto 14px;
+    display:flex; align-items:center; justify-content:center; position:relative;
+    overflow:hidden; background:#080811; border:2px solid var(--line); padding:8px;
+  }
+  .avatar-wrap::after{
+    content:""; position:absolute; inset:0; pointer-events:none;
+    box-shadow:inset 0 0 45px rgba(10,10,20,.35);
+  }
+  .avatar-wrap img{
+    display:block; width:auto; height:auto; max-width:100%; max-height:440px;
+    object-fit:contain; image-rendering:auto;
+  }
+  .avatar-wrap svg{ width:210px; height:265px; }
+  .media-loader{
+    width:36px; height:36px; border:3px solid var(--line); border-top-color:var(--magenta);
+    border-radius:50%; animation:spin .75s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .hint-chip{
+    display:inline-block; font-family:'JetBrains Mono',monospace; font-size:12px;
+    color:var(--gold); border:1px dashed var(--gold); padding:6px 12px; margin-top:10px; cursor:pointer;
+  }
+  .hint-chip.revealed{ cursor:default; }
+
+  .play-block{ display:flex; flex-direction:column; align-items:center; gap:16px; padding:20px 0; }
+  .play-btn{
+    width:110px; height:110px; border-radius:50%;
+    background:var(--panel-2); border:2px solid var(--cyan);
+    color:var(--cyan); font-size:34px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    transition:transform .12s ease;
+  }
+  .play-btn:hover{ transform:scale(1.05); }
+  .play-btn:disabled{ opacity:.45; cursor:wait; transform:none; }
+  .play-btn.playing{ animation:beat 0.4s infinite alternate; }
+  @keyframes beat{ from{box-shadow:0 0 0 0 rgba(41,224,209,0.5);} to{box-shadow:0 0 0 14px rgba(41,224,209,0);} }
+  .waveform{ display:flex; align-items:flex-end; gap:3px; height:40px; }
+  .waveform span{ width:4px; background:var(--cyan); opacity:0.5; height:8px; }
+  .waveform.active span{ animation:wf 0.9s ease-in-out infinite; }
+  .waveform span:nth-child(odd){ animation-delay:0.15s; }
+  .waveform span:nth-child(3n){ animation-delay:0.3s; }
+  @keyframes wf{ 0%,100%{height:8px;opacity:.4;} 50%{height:36px;opacity:1;} }
+  .media-status{
+    min-height:18px; color:var(--muted); font-family:'JetBrains Mono',monospace;
+    font-size:12px; line-height:1.5;
+  }
+  .media-status.error{ color:var(--gold); }
+
+  .options{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:24px; }
+  @media (max-width:560px){ .options{ grid-template-columns:1fr; } }
+  .opt{
+    background:var(--void); border:2px solid var(--line); color:var(--ink);
+    padding:16px 14px; font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:14px;
+    cursor:pointer; text-align:left; transition:border-color .1s ease, background .1s ease;
+  }
+  .opt:hover:not(:disabled){ border-color:var(--muted); }
+  .opt:disabled{ cursor:default; }
+  .opt.correct{ background:rgba(84,201,139,0.15); border-color:#54c98b; color:#54c98b; }
+  .opt.wrong{ background:rgba(255,46,99,0.15); border-color:var(--magenta); color:var(--magenta); }
+  .opt.dim{ opacity:0.35; }
+
+  .feedback{ margin-top:18px; font-family:'JetBrains Mono',monospace; font-size:13px; min-height:20px; }
+  .feedback.good{ color:#54c98b; }
+  .feedback.bad{ color:var(--magenta); }
+
+  /* ---- Results ---- */
+  .result-card{ background:var(--panel); border:2px solid var(--line); padding:40px 30px; text-align:center; }
+  .result-score{ font-family:'Zen Dots',cursive; font-size:52px; color:var(--gold); margin:0 0 6px;}
+  .result-sub{ color:var(--muted); font-size:14px; margin-bottom:26px; }
+  .result-grid{ display:flex; justify-content:center; gap:34px; margin-bottom:30px; flex-wrap:wrap;}
+  .result-grid div{ font-family:'JetBrains Mono',monospace; }
+  .result-grid .n{ font-size:22px; color:var(--ink); display:block; }
+  .result-grid .l{ font-size:11px; color:var(--muted); }
+  .result-actions{ display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+  .ghost-btn{
+    background:none; border:2px solid var(--line); color:var(--ink);
+    font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:13px;
+    padding:12px 22px; cursor:pointer;
+  }
+  .ghost-btn:hover{ border-color:var(--ink); }
+
+  footer{ margin-top:60px; padding-top:20px; border-top:1px solid var(--line); color:var(--muted); font-size:12px; font-family:'JetBrains Mono',monospace; line-height:1.7;}
+</style>
+</head>
+<body>
+<div class="grain-glow"></div>
+<div id="app"></div>
+
+<script>
+/* =========================================================
+   DATA — 100 characters, 50 openings
+   ========================================================= */
+const CHARACTERS = [
+["Naruto Uzumaki","Naruto","easy","Loud ninja who dreams of being Hokage"],
+["Monkey D. Luffy","One Piece","easy","Rubber-bodied captain hunting the One Piece"],
+["Son Goku","Dragon Ball","easy","Saiyan raised on Earth, loves fighting"],
+["Ichigo Kurosaki","Bleach","easy","Orange-haired substitute Soul Reaper"],
+["Edward Elric","Fullmetal Alchemist","easy","Short-tempered alchemist with automail arm"],
+["Light Yagami","Death Note","easy","Honor student who found a death god's notebook"],
+["L","Death Note","easy","Barefoot detective who sits oddly"],
+["Izuku Midoriya","My Hero Academia","easy","Quirkless boy who inherits One For All"],
+["Katsuki Bakugo","My Hero Academia","easy","Explosive-tempered rival with grenade palms"],
+["Eren Yeager","Attack on Titan","easy","Boy who swore to wipe out the Titans"],
+["Mikasa Ackerman","Attack on Titan","easy","Fiercely loyal soldier, elite fighter"],
+["Levi Ackerman","Attack on Titan","easy","Humanity's strongest, obsessed with cleanliness"],
+["Tanjiro Kamado","Demon Slayer","easy","Kind charcoal seller turned demon slayer"],
+["Nezuko Kamado","Demon Slayer","easy","Demon sister who protects humans"],
+["Zenitsu Agatsuma","Demon Slayer","easy","Cowardly swordsman, deadly asleep"],
+["Inosuke Hashibira","Demon Slayer","easy","Boar-mask wearer raised by boars"],
+["Satoru Gojo","Jujutsu Kaisen","easy","Strongest sorcerer, wears a blindfold"],
+["Yuji Itadori","Jujutsu Kaisen","easy","Swallowed a cursed finger, superhuman athlete"],
+["Megumi Fushiguro","Jujutsu Kaisen","easy","Shadow-summoning sorcerer, stoic"],
+["Saitama","One Punch Man","easy","Bald hero who defeats everyone in one hit"],
+["Genos","One Punch Man","easy","Cyborg disciple seeking revenge"],
+["Killua Zoldyck","Hunter x Hunter","easy","Assassin family heir, lightning powers"],
+["Gon Freecss","Hunter x Hunter","easy","Cheerful boy searching for his father"],
+["Natsu Dragneel","Fairy Tail","easy","Fire dragon slayer, guild member"],
+["Lucy Heartfilia","Fairy Tail","easy","Celestial spirit mage from a wealthy family"],
+["Kirito","Sword Art Online","easy","Black-coated solo swordsman trapped in a game"],
+["Asuna Yuuki","Sword Art Online","easy","Vice-commander known as the Flash"],
+["Rimuru Tempest","That Time I Got Reincarnated as a Slime","easy","Reincarnated as a slime, becomes a demon lord"],
+["Anya Forger","Spy x Family","easy","Telepathic child in a fake spy family"],
+["Loid Forger","Spy x Family","easy","Master spy posing as a father"],
+["Denji","Chainsaw Man","easy","Devil hunter with a chainsaw for a head"],
+["Power","Chainsaw Man","easy","Blood fiend, proud and chaotic"],
+["Sasuke Uchiha","Naruto","easy","Last of his clan, chasing power and revenge"],
+["Kakashi Hatake","Naruto","easy","Copy ninja who reads under his mask"],
+["Roronoa Zoro","One Piece","easy","Three-sword-style swordsman, terrible sense of direction"],
+["Nami","One Piece","easy","Navigator who dreams of mapping the world"],
+["Vegeta","Dragon Ball","easy","Proud Saiyan prince, Goku's rival"],
+["Yusuke Urameshi","Yu Yu Hakusho","easy","Delinquent turned Spirit Detective"],
+["Spike Spiegel","Cowboy Bebop","easy","Laid-back bounty hunter with a past"],
+["Lelouch Lamperouge","Code Geass","easy","Exiled prince with the power of absolute obedience"],
+["Shinji Ikari","Neon Genesis Evangelion","medium","Reluctant teen pilot of a bio-mechanical robot"],
+["Rei Ayanami","Neon Genesis Evangelion","medium","Quiet, mysterious Eva pilot"],
+["Asuka Langley Soryu","Neon Genesis Evangelion","medium","Prideful, skilled Eva pilot from Germany"],
+["Guts","Berserk","medium","Mercenary swordsman wielding an enormous blade"],
+["Griffith","Berserk","medium","Charismatic mercenary leader with grand ambitions"],
+["Alucard","Hellsing","medium","Ancient vampire serving a secret organization"],
+["Faye Valentine","Cowboy Bebop","medium","Amnesiac gambler and bounty hunter"],
+["Motoko Kusanagi","Ghost in the Shell","medium","Cyborg special-ops commander"],
+["Rin Okumura","Blue Exorcist","medium","Son of Satan training to be an exorcist"],
+["Meliodas","The Seven Deadly Sins","medium","Tiny-looking captain hiding immense power"],
+["Escanor","The Seven Deadly Sins","medium","Sin of Pride, strongest at high noon"],
+["Thorfinn","Vinland Saga","medium","Viking boy seeking revenge, later peace"],
+["Askeladd","Vinland Saga","medium","Cunning mercenary band leader"],
+["Violet Evergarden","Violet Evergarden","medium","Former soldier who writes letters for others"],
+["Shoyo Hinata","Haikyuu!!","medium","Small but explosive volleyball spiker"],
+["Tobio Kageyama","Haikyuu!!","medium","Prodigy setter nicknamed the King of the Court"],
+["Yuri Katsuki","Yuri!!! on Ice","medium","Anxious figure skater chasing a comeback"],
+["Sebastian Michaelis","Black Butler","medium","Demon butler bound by a contract"],
+["Ciel Phantomhive","Black Butler","medium","Young earl with a demonic butler"],
+["Mob (Shigeo Kageyama)","Mob Psycho 100","medium","Reserved psychic trying to stay ordinary"],
+["Reigen Arataka","Mob Psycho 100","medium","Self-proclaimed psychic con-man mentor"],
+["Rintaro Okabe","Steins;Gate","medium","Self-declared mad scientist who bends time"],
+["Kurisu Makise","Steins;Gate","medium","Genius neuroscientist skeptical of time travel"],
+["Subaru Natsuki","Re:Zero","medium","Otherworlder who returns by death"],
+["Emilia","Re:Zero","medium","Half-elf candidate for the throne"],
+["Rem","Re:Zero","medium","Devoted blue-haired maid with a spiked flail"],
+["Yato","Noragami","medium","Minor god seeking worshippers"],
+["Jotaro Kujo","JoJo's Bizarre Adventure","medium","Delinquent with the Stand Star Platinum"],
+["Dio Brando","JoJo's Bizarre Adventure","medium","Vampiric villain who stole a body and a Stand"],
+["Joseph Joestar","JoJo's Bizarre Adventure","medium","Wisecracking Hamon user, master of trickery"],
+["Kaneki Ken","Tokyo Ghoul","medium","College student turned half-ghoul"],
+["Touka Kirishima","Tokyo Ghoul","medium","Fierce ghoul working at a coffee shop"],
+["Erza Scarlet","Fairy Tail","medium","Armor-wielding S-class mage"],
+["Gray Fullbuster","Fairy Tail","medium","Ice mage with a stripping habit"],
+["Yona","Yona of the Dawn","medium","Exiled princess learning to fight"],
+["Riko","Made in Abyss","hard","Determined girl descending the Abyss"],
+["Reg","Made in Abyss","hard","Robot boy found at the bottom of the Abyss"],
+["Nanachi","Made in Abyss","hard","Rabbit-like hollow, once human"],
+["Kino","Kino's Journey","hard","Traveler who visits each country for three days"],
+["Lain Iwakura","Serial Experiments Lain","hard","Withdrawn girl pulled into the Wired network"],
+["Simon","Gurren Lagann","hard","Digger boy who pilots a mecha to pierce the heavens"],
+["Kamina","Gurren Lagann","hard","Bombastic leader who believes in his drill"],
+["Yoko Littner","Gurren Lagann","hard","Sniper with a giant rifle and red hair"],
+["Revy","Black Lagoon","hard","Twin-pistol mercenary with a violent temper"],
+["Rock","Black Lagoon","hard","Former salaryman turned pirate negotiator"],
+["Shion","No.6","hard","Sheltered elite boy who shelters a fugitive"],
+["Nezumi","No.6","hard","Fugitive living in the ruins outside the city"],
+["Ai Ohto","Wonder Egg Priority","hard","Girl who hatches eggs to fight for lost friends"],
+["Chise Hatori","The Ancient Magus' Bride","hard","Sold girl who becomes a mage's apprentice"],
+["Elias Ainsworth","The Ancient Magus' Bride","hard","Non-human mage who takes in Chise"],
+["Homura Akemi","Puella Magi Madoka Magica","hard","Time-looping magical girl protecting a friend"],
+["Madoka Kaname","Puella Magi Madoka Magica","hard","Kind girl offered a wish by a strange creature"],
+["Kyubey","Puella Magi Madoka Magica","hard","Emotionless creature that grants wishes"],
+["Sosuke Sagara","Full Metal Panic!","hard","Awkward soldier undercover as a student"],
+["Shirou Emiya","Fate/stay night","hard","Aspiring hero who can trace any weapon"],
+["Saber","Fate/stay night","hard","Noble knight-class Servant wielding an invisible sword"],
+["Archer","Fate/stay night","hard","Bow-wielding Servant with a grim outlook"],
+["Koro-sensei","Assassination Classroom","hard","Tentacled super-teacher who must be assassinated"],
+["Nagisa Shiota","Assassination Classroom","hard","Soft-spoken student training to be an assassin"],
+["Chitanda Eru","Hyouka","hard","Endlessly curious club president"]
+];
+
+const OPENINGS = [
+["Gurenge","Demon Slayer","easy"],
+["Kaikai Kitan","Jujutsu Kaisen","easy"],
+["Zankoku na Tenshi no Thesis","Neon Genesis Evangelion","easy"],
+["We Are!","One Piece","easy"],
+["Sign","Naruto Shippuden","easy"],
+["Again","Fullmetal Alchemist: Brotherhood","easy"],
+["The Hero!!","One Punch Man","easy"],
+["Peace Sign","My Hero Academia","easy"],
+["Guren no Yumiya","Attack on Titan","easy"],
+["Odd Future","My Hero Academia","easy"],
+["Silhouette","Naruto Shippuden","easy"],
+["Blue Bird","Naruto Shippuden","easy"],
+["Cha-La Head-Cha-La","Dragon Ball Z","easy"],
+["Asterisk","Bleach","easy"],
+["Crossing Field","Sword Art Online","easy"],
+["Unravel","Tokyo Ghoul","easy"],
+["Sorairo Days","Gurren Lagann","easy"],
+["Rain","Fullmetal Alchemist: Brotherhood","easy"],
+["Believe","One Piece","easy"],
+["Tank!","Cowboy Bebop","easy"],
+["Departure!","Hunter x Hunter (2011)","medium"],
+["Ranbu no Melody","Bleach","medium"],
+["Ignite","Sword Art Online II","medium"],
+["Colors","Code Geass","medium"],
+["Uninstall","Bokurano","medium"],
+["Stand Proud","JoJo's Bizarre Adventure","medium"],
+["Bloody Stream","JoJo's Bizarre Adventure","medium"],
+["Sono Chi no Sadame","JoJo's Bizarre Adventure","medium"],
+["Rise","Ghost in the Shell: Stand Alone Complex 2nd GIG","medium"],
+["Shinzou wo Sasageyo!","Attack on Titan","medium"],
+["Red Swan","Attack on Titan","medium"],
+["My War","Attack on Titan","medium"],
+["Bokurano","My Hero Academia","medium"],
+["Kizuna no Kiseki","Demon Slayer","medium"],
+["Kaze wo Sagashite","One Piece","medium"],
+["GO!!!","Naruto","medium"],
+["Haruka Kanata","Naruto","medium"],
+["Rocks","Naruto","medium"],
+["Hacking to the Gate","Steins;Gate","hard"],
+["Fiction","Wotakoi: Love is Hard for Otaku","hard"],
+["Duvet","Serial Experiments Lain","hard"],
+["Hikari e","One Piece","hard"],
+["Ohayou.","Hunter x Hunter","hard"],
+["Moonlight Densetsu","Sailor Moon","hard"],
+["Sailor Star Song","Sailor Moon Sailor Stars","hard"],
+["Renai Circulation","Bakemonogatari","hard"],
+["Complication","Durarara!!","hard"],
+["Uragiri no Yuuyake","Durarara!!","hard"],
+["Golden Time Lover","Fullmetal Alchemist: Brotherhood","hard"],
+["Sora ni Utaeba","My Hero Academia","hard"]
+];
+
+/* Pre-resolved, verified media: avoids unreliable search during gameplay. */
+const OPENING_MEDIA = {
+  "Gurenge": "https://v.animethemes.moe/KimetsuNoYaiba-OP1.webm",
+  "Kaikai Kitan": "https://v.animethemes.moe/JujutsuKaisen-OP1v3.webm",
+  "Zankoku na Tenshi no Thesis": "https://v.animethemes.moe/NeonGenesisEvangelion-OP1.webm",
+  "We Are!": "https://v.animethemes.moe/OnePiece-OP1-NCDVD480.webm",
+  "Sign": "https://v.animethemes.moe/NarutoShippuuden-OP6.webm",
+  "Again": "https://v.animethemes.moe/FullmetalAlchemistBrotherhood-OP1.webm",
+  "The Hero!!": "https://v.animethemes.moe/OnePunchMan-OP1.webm",
+  "Peace Sign": "https://v.animethemes.moe/BokuNoHeroAcademiaS2-OP1-NCBD1080.webm",
+  "Guren no Yumiya": "https://v.animethemes.moe/ShingekiNoKyojin-OP1.webm",
+  "Odd Future": "https://v.animethemes.moe/BokuNoHeroAcademiaS3-OP1.webm",
+  "Silhouette": "https://v.animethemes.moe/NarutoShippuuden-OP16.webm",
+  "Blue Bird": "https://v.animethemes.moe/NarutoShippuuden-OP3.webm",
+  "Cha-La Head-Cha-La": "https://v.animethemes.moe/DragonBallZ-OP1.webm",
+  "Asterisk": "https://v.animethemes.moe/Bleach-OP1.webm",
+  "Crossing Field": "https://v.animethemes.moe/SwordArtOnline-OP1.webm",
+  "Unravel": "https://v.animethemes.moe/TokyoGhoul-OP1.webm",
+  "Sorairo Days": "https://v.animethemes.moe/TengenToppaGurrenLagann-OP1.webm",
+  "Rain": "https://v.animethemes.moe/FullmetalAlchemistBrotherhood-OP5.webm",
+  "Believe": "https://v.animethemes.moe/OnePiece-OP2-NCDVD480.webm",
+  "Tank!": "https://v.animethemes.moe/CowboyBebop-OP1.webm",
+  "Departure!": "https://v.animethemes.moe/HunterHunter2011-OP1.webm",
+  "Ranbu no Melody": "https://v.animethemes.moe/Bleach-OP13.webm",
+  "Ignite": "https://v.animethemes.moe/SwordArtOnlineS2-OP1.webm",
+  "Colors": "https://v.animethemes.moe/CodeGeassMovie1-OP1.webm",
+  "Uninstall": "https://v.animethemes.moe/Bokurano-OP1.webm",
+  "Stand Proud": "https://v.animethemes.moe/JojoNoKimyouNaBoukenS2-OP1v2.webm",
+  "Bloody Stream": "https://v.animethemes.moe/JojoNoKimyouNaBouken-OP2v2.webm",
+  "Sono Chi no Sadame": "https://v.animethemes.moe/JojoNoKimyouNaBouken-OP1.webm",
+  "Rise": "https://v.animethemes.moe/GhostInTheShellSAC2ndGIG-OP1.webm",
+  "Shinzou wo Sasageyo!": "https://v.animethemes.moe/ShingekiNoKyojinS2-OP1.webm",
+  "Red Swan": "https://v.animethemes.moe/ShingekiNoKyojinS3-OP1.webm",
+  "My War": "https://v.animethemes.moe/ShingekiNoKyojinS4-OP1.webm",
+  "Bokurano": "https://v.animethemes.moe/BokuNoHeroAcademiaS6-OP2.webm",
+  "Kizuna no Kiseki": "https://v.animethemes.moe/KimetsuNoYaibaKatanakajiNoSatoHen-OP1.webm",
+  "Kaze wo Sagashite": "https://v.animethemes.moe/OnePiece-OP12-NCDVD480.webm",
+  "GO!!!": "https://v.animethemes.moe/Naruto-OP4.webm",
+  "Haruka Kanata": "https://v.animethemes.moe/Naruto-OP2.webm",
+  "Rocks": "https://v.animethemes.moe/Naruto-OP1.webm",
+  "Hacking to the Gate": "https://v.animethemes.moe/SteinsGate-OP1v2.webm",
+  "Fiction": "https://v.animethemes.moe/WotaKoi-OP1v2.webm",
+  "Duvet": "https://v.animethemes.moe/SerialExperimentsLain-OP1.webm",
+  "Hikari e": "https://v.animethemes.moe/OnePiece-OP3-NCDVD480.webm",
+  "Ohayou.": "https://v.animethemes.moe/HunterHunter-OP1.webm",
+  "Moonlight Densetsu": "https://v.animethemes.moe/SailorMoon-OP1v2.webm",
+  "Sailor Star Song": "https://v.animethemes.moe/SailorMoonSailorStars-OP1.webm",
+  "Renai Circulation": "https://v.animethemes.moe/Bakemonogatari-OP4.webm",
+  "Complication": "https://v.animethemes.moe/Durarara-OP2.webm",
+  "Uragiri no Yuuyake": "https://v.animethemes.moe/Durarara-OP1.webm",
+  "Golden Time Lover": "https://v.animethemes.moe/FullmetalAlchemistBrotherhood-OP3.webm",
+  "Sora ni Utaeba": "https://v.animethemes.moe/BokuNoHeroAcademiaS2-OP2-NCBD1080.webm"
+};
+
+/* =========================================================
+   UTIL — deterministic hashing
+   ========================================================= */
+function hashStr(s){
+  let h = 2166136261;
+  for(let i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h,16777619); }
+  return h >>> 0;
+}
+function rngFromSeed(seed){
+  let s = seed % 2147483647; if(s<=0) s += 2147483646;
+  return function(){ s = (s*16807) % 2147483647; return (s-1)/2147483646; };
+}
+function shuffle(arr, rnd){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor((rnd?rnd():Math.random())*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+function pick(arr, n, rnd){ return shuffle(arr, rnd).slice(0,n); }
+
+/* =========================================================
+   AVATAR FALLBACK — shown only if both artwork services fail
+   ========================================================= */
+const PALETTES = [
+  ["#ff2e63","#ff8ba0"],["#29e0d1","#8bf5ec"],["#ffce54","#ffe6a3"],
+  ["#8b6bff","#c3b3ff"],["#54c98b","#a6ecc4"],["#ff8a3d","#ffc79a"],
+  ["#3d6bff","#a3bcff"],["#ff5ac4","#ffb8e6"]
+];
+const SILHOUETTES = ['bust','spiky','ponytail','hood','horns'];
+const ICONS = ['⚡','🔥','🌙','⚔️','❄️','🌸','👁️','🗡️'];
+
+function avatarSVG(name){
+  const seed = hashStr(name);
+  const rnd = rngFromSeed(seed);
+  const pal = PALETTES[seed % PALETTES.length];
+  const shape = SILHOUETTES[seed % SILHOUETTES.length];
+  const icon = ICONS[Math.floor(rnd()*ICONS.length)];
+  const rot = Math.floor(rnd()*360);
+  let hairPath = '';
+  if(shape==='spiky'){
+    hairPath = `<path d="M40 70 L48 20 L58 55 L66 15 L76 55 L86 20 L94 70 Z" fill="${pal[0]}"/>`;
+  } else if(shape==='ponytail'){
+    hairPath = `<circle cx="67" cy="52" r="30" fill="${pal[0]}"/><path d="M95 55 Q125 65 110 110" stroke="${pal[0]}" stroke-width="10" fill="none" stroke-linecap="round"/>`;
+  } else if(shape==='hood'){
+    hairPath = `<path d="M30 90 Q35 25 67 25 Q99 25 104 90 Z" fill="${pal[0]}"/>`;
+  } else if(shape==='horns'){
+    hairPath = `<circle cx="67" cy="55" r="28" fill="${pal[0]}"/><path d="M45 35 L35 5 L55 25 Z" fill="${pal[1]}"/><path d="M89 35 L99 5 L79 25 Z" fill="${pal[1]}"/>`;
+  } else {
+    hairPath = `<circle cx="67" cy="52" r="30" fill="${pal[0]}"/>`;
+  }
+  return `
+  <svg viewBox="0 0 134 170" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="bg-${seed}" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="${pal[1]}" stop-opacity="0.15"/>
+        <stop offset="100%" stop-color="${pal[0]}" stop-opacity="0.25"/>
+      </linearGradient>
+      <pattern id="pat-${seed}" width="10" height="10" patternTransform="rotate(${rot})" patternUnits="userSpaceOnUse">
+        <circle cx="2" cy="2" r="1.2" fill="${pal[0]}" opacity="0.25"/>
+      </pattern>
+    </defs>
+    <rect x="0" y="0" width="134" height="170" fill="url(#bg-${seed})"/>
+    <rect x="0" y="0" width="134" height="170" fill="url(#pat-${seed})"/>
+    <rect x="3" y="3" width="128" height="164" fill="none" stroke="${pal[0]}" stroke-width="2"/>
+    ${hairPath}
+    <ellipse cx="67" cy="60" rx="24" ry="26" fill="#0a0a14" opacity="0.85"/>
+    <path d="M20 168 Q30 118 67 118 Q104 118 114 168 Z" fill="${pal[0]}" opacity="0.9"/>
+    <text x="67" y="150" font-size="26" text-anchor="middle">${icon}</text>
+  </svg>`;
+}
+
+/* =========================================================
+   LIVE MEDIA — character artwork + real anime opening audio
+   ========================================================= */
+const MEDIA_CACHE_PREFIX = 'anime-quiz-media-v3:';
+const CHARACTER_SEARCH_ALIASES = {
+  'L':'L Lawliet',
+  'Mob (Shigeo Kageyama)':'Shigeo Kageyama',
+  'Rock':'Rokurou Okajima',
+  'Reg':'Regu',
+  'Saber':'Saber',
+  'Archer':'EMIYA'
+};
+/* High-resolution/verified overrides for characters that public catalogue
+   search commonly confuses or does not contain. */
+const CHARACTER_MEDIA = {
+  "Ai Ohto": "https://img.anime2you.de/2020/12/wonder-egg-cd113.png",
+  "Anya Forger": "https://data.onnada.com/character/202111/2036616335_284c54b7_94040f.png",
+  "Loid Forger": "https://a.storyblok.com/f/178900/568x1103/de0f4f21d1/spy-x-fam_chara_loid_1.png/m/filters%3Aquality%2895%29format%28webp%29",
+  "Nezumi": "https://media.kitsu.app/characters/images/33888/original.jpg",
+  "Reg": "https://media.kitsu.app/characters/images/62198/original.jpg",
+  "Saber": "https://media.kitsu.app/characters/images/6553/original.jpg",
+  "Satoru Gojo": "https://jj-senkasouran.bn-ent.net/images/character/gojo/ill.png",
+  "Simon": "https://media.kitsu.app/characters/images/19269/original.jpg"
+};
+let currentAudio = null;
+let mediaRequestId = 0;
+
+function normalizeMediaText(value){
+  return String(value || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .toLowerCase().replace(/[^a-z0-9]/g,'');
+}
+
+function titlesMatch(a,b){
+  const x = normalizeMediaText(a);
+  const y = normalizeMediaText(b);
+  return !!x && !!y && (x===y || (Math.min(x.length,y.length)>=5 && (x.includes(y) || y.includes(x))));
+}
+
+function cacheRead(key){
+  try{
+    const raw = localStorage.getItem(MEDIA_CACHE_PREFIX+key);
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){ return null; }
+}
+
+function cacheWrite(key,value){
+  try{ localStorage.setItem(MEDIA_CACHE_PREFIX+key, JSON.stringify(value)); }catch(e){}
+}
+
+async function fetchJSON(url, timeoutMs=12000){
+  const controller = new AbortController();
+  const timeout = setTimeout(()=>controller.abort(), timeoutMs);
+  try{
+    const response = await fetch(url,{signal:controller.signal});
+    if(!response.ok) throw new Error('Media request failed');
+    return await response.json();
+  }finally{ clearTimeout(timeout); }
+}
+
+function preloadImage(url){
+  return new Promise((resolve,reject)=>{
+    const img = new Image();
+    const timeout = setTimeout(()=>reject(new Error('Image timed out')),10000);
+    img.onload = ()=>{ clearTimeout(timeout); resolve(url); };
+    img.onerror = ()=>{ clearTimeout(timeout); reject(new Error('Image failed')); };
+    img.src = url;
+  });
+}
+
+function preloadAudio(url){
+  return new Promise((resolve,reject)=>{
+    const audio = new Audio();
+    const cleanup = ()=>{
+      clearTimeout(timeout);
+      audio.removeEventListener('loadedmetadata',ready);
+      audio.removeEventListener('canplay',ready);
+      audio.removeEventListener('error',failed);
+    };
+    const ready = ()=>{ cleanup(); resolve(audio); };
+    const failed = ()=>{ cleanup(); reject(new Error('Audio failed')); };
+    const timeout = setTimeout(()=>{ cleanup(); reject(new Error('Audio timed out')); },12000);
+    audio.preload = 'metadata';
+    audio.addEventListener('loadedmetadata',ready,{once:true});
+    audio.addEventListener('canplay',ready,{once:true});
+    audio.addEventListener('error',failed,{once:true});
+    audio.src = url;
+    audio.load();
+  });
+}
+
+async function loadCharacterMedia(q){
+  const key = 'character:'+normalizeMediaText(q.name);
+  const cached = cacheRead(key);
+  if(cached && cached.url){
+    try{ await preloadImage(cached.url); return cached; }catch(e){}
+  }
+
+  const verifiedUrl = CHARACTER_MEDIA[q.name];
+  if(verifiedUrl){
+    try{
+      await preloadImage(verifiedUrl);
+      const media = {url:verifiedUrl,source:'Verified character artwork'};
+      cacheWrite(key,media);
+      return media;
+    }catch(e){}
+  }
+
+  const searchName = CHARACTER_SEARCH_ALIASES[q.name] || q.name;
+  let url = null;
+  let source = null;
+
+  /* Kitsu's original file is used first. Its generated "large" thumbnail can
+     contain aggressive sharpening and color artifacts. */
+  try{
+    const params = new URLSearchParams({'filter[name]':searchName,'page[limit]':'10'});
+    const data = await fetchJSON('https://kitsu.io/api/edge/characters?'+params.toString());
+    const characters = Array.isArray(data.data) ? data.data : [];
+    const exact = characters.find(item=>titlesMatch(item.attributes && item.attributes.canonicalName,searchName));
+    const selected = exact || characters[0];
+    url = selected && selected.attributes && selected.attributes.image && selected.attributes.image.original;
+    if(url) source = 'Original Kitsu character artwork';
+  }catch(e){}
+
+  if(!url){
+    const params = new URLSearchParams({
+      q:searchName,
+      order_by:'favorites',
+      sort:'desc',
+      limit:'10'
+    });
+    const data = await fetchJSON('https://api.jikan.moe/v4/characters?'+params.toString());
+    const characters = Array.isArray(data.data) ? data.data : [];
+    const exact = characters.find(item=>titlesMatch(item.name,searchName));
+    const selected = exact || characters[0];
+    url = selected && selected.images && (
+      (selected.images.webp && selected.images.webp.image_url) ||
+      (selected.images.jpg && selected.images.jpg.image_url)
+    );
+    if(url) source = 'MyAnimeList artwork via Jikan';
+  }
+  if(!url) throw new Error('No character artwork found');
+  await preloadImage(url);
+  const media = {url,source};
+  cacheWrite(key,media);
+  return media;
+}
+
+function jsonp(url, timeoutMs=12000){
+  return new Promise((resolve,reject)=>{
+    const callback = '__animeQuizJSONP'+Date.now()+Math.floor(Math.random()*10000);
+    const script = document.createElement('script');
+    const cleanup = ()=>{
+      clearTimeout(timeout);
+      delete window[callback];
+      script.remove();
+    };
+    window[callback] = data=>{ cleanup(); resolve(data); };
+    script.onerror = ()=>{ cleanup(); reject(new Error('Preview search failed')); };
+    const timeout = setTimeout(()=>{ cleanup(); reject(new Error('Preview search timed out')); },timeoutMs);
+    script.src = url + (url.includes('?')?'&':'?') + 'callback=' + callback;
+    document.head.appendChild(script);
+  });
+}
+
+async function findApplePreview(q){
+  const params = new URLSearchParams({
+    term:q.name,
+    media:'music',
+    entity:'song',
+    country:'JP',
+    lang:'en_us',
+    limit:'20'
+  });
+  const data = await jsonp('https://itunes.apple.com/search?'+params.toString());
+  const tracks = (data.results || []).filter(track=>track.previewUrl);
+  const selected = tracks.find(track=>titlesMatch(track.trackName,q.name)) || tracks[0];
+  if(!selected) throw new Error('No music preview found');
+  return {url:selected.previewUrl,source:'Apple Music preview'};
+}
+
+async function preloadAudioWithRetry(url, attempts=2){
+  let lastError;
+  for(let attempt=0;attempt<attempts;attempt++){
+    try{ return await preloadAudio(url); }
+    catch(error){
+      lastError = error;
+      if(attempt<attempts-1) await new Promise(resolve=>setTimeout(resolve,700));
+    }
+  }
+  throw lastError || new Error('Audio failed');
+}
+
+async function loadOpeningMedia(q){
+  const key = 'opening:'+normalizeMediaText(q.name)+'-'+normalizeMediaText(q.anime);
+  const cached = cacheRead(key);
+  if(cached && cached.url){
+    try{
+      const audio = await preloadAudioWithRetry(cached.url);
+      return {...cached,audio};
+    }catch(e){}
+  }
+
+  let media = null;
+  const fixedUrl = OPENING_MEDIA[q.name];
+  if(fixedUrl){
+    try{
+      const audio = await preloadAudioWithRetry(fixedUrl);
+      media = {url:fixedUrl,source:'AnimeThemes',audio};
+    }catch(e){}
+  }
+  if(!media){
+    const preview = await findApplePreview(q);
+    const audio = await preloadAudioWithRetry(preview.url);
+    media = {...preview,audio};
+  }
+  cacheWrite(key,{url:media.url,source:media.source});
+  return media;
+}
+
+function stopCurrentAudio(){
+  if(currentAudio){
+    currentAudio.pause();
+    try{ currentAudio.currentTime = 0; }catch(e){}
+    currentAudio.onplay = null;
+    currentAudio.onpause = null;
+    currentAudio.onended = null;
+    currentAudio = null;
+  }
+  state.playing = false;
+}
+
+function setPlayingUI(playing){
+  state.playing = playing;
+  const btn = document.getElementById('playBtn');
+  const wf = document.getElementById('waveform');
+  if(btn){
+    btn.classList.toggle('playing',playing);
+    btn.innerHTML = playing ? '&#9632;' : '&#9658;';
+    btn.setAttribute('aria-label',playing?'Pause opening':'Play opening');
+  }
+  if(wf) wf.classList.toggle('active',playing);
+}
+
+async function toggleOpeningPlayback(){
+  if(state.answered) return;
+  if(!currentAudio){
+    if(state.media.status==='error') beginQuestion();
+    return;
+  }
+  if(!currentAudio.paused){ currentAudio.pause(); return; }
+  try{
+    if(currentAudio.ended) currentAudio.currentTime = 0;
+    await currentAudio.play();
+  }catch(e){
+    const status = document.getElementById('mediaStatus');
+    if(status){ status.textContent='Playback was blocked — tap play once more.'; status.classList.add('error'); }
+    setPlayingUI(false);
+  }
+}
+
+/* =========================================================
+   GAME STATE / ENGINE
+   ========================================================= */
+const state = {
+  view:'home',
+  mode:null,        // 'char' | 'song'
+  difficulty:'mixed',
+  qCount:10,
+  questions:[],
+  qIndex:0,
+  score:0,
+  streak:0,
+  correctCount:0,
+  hintUsed:false,
+  timer:null,
+  timeLeft:0,
+  timeLimit:15,
+  answered:false,
+  playing:false,
+  media:{status:'idle',url:null,source:null,error:null}
+};
+
+function poolFor(mode, diff){
+  const src = mode==='char' ? CHARACTERS : OPENINGS;
+  if(diff==='mixed') return src;
+  return src.filter(x=>x[2]===diff);
+}
+
+function buildQuestions(mode, diff, count){
+  const pool = poolFor(mode, diff);
+  const chosen = pick(pool, Math.min(count, pool.length));
+  return chosen.map(item=>{
+    const [name, anime, itemDiff, extra] = item;
+    // distractor pool: same mode, different correct answer text
+    const answerKey = mode==='char' ? name : anime;
+    const fullPool = mode==='char' ? CHARACTERS : OPENINGS;
+    const candidates = Array.from(new Set(
+      fullPool.filter(x=> (mode==='char'?x[0]:x[1]) !== answerKey).map(x=> mode==='char'?x[0]:x[1])
+    ));
+    const distractors = pick(candidates, 3);
+    const options = shuffle([answerKey, ...distractors]);
+    return {
+      name, anime, difficulty:itemDiff, extra,
+      answer: answerKey,
+      options
+    };
+  });
+}
+
+/* =========================================================
+   RENDERING
+   ========================================================= */
+const app = document.getElementById('app');
+
+function render(){
+  if(state.view==='home') return renderHome();
+  if(state.view==='setup') return renderSetup();
+  if(state.view==='quiz') return renderQuiz();
+  if(state.view==='result') return renderResult();
+}
+
+function renderHome(){
+  app.innerHTML = `
+    <div class="topbar">
+      <div class="logo"><span class="dot"></span> ANIME QUIZ ARCADE</div>
+      <div class="tc">${CHARACTERS.length} CHARS · ${OPENINGS.length} OPENINGS</div>
+    </div>
+    <div class="hero">
+      <div class="eyebrow">TWO MINIGAMES // THREE DIFFICULTIES</div>
+      <h1>How well do you actually know anime?</h1>
+      <p>Guess the character from their real artwork, or listen to an anime opening and name the show. Pick your difficulty and see how high you can score.</p>
+    </div>
+    <div class="modes">
+      <div class="mode-card char" data-mode="char">
+        <div class="tick">MODE // 01</div>
+        <h2>Character ID</h2>
+        <p>A mystery character image and a hint appear. Pick the right name from four options before the clock runs out.</p>
+        <div class="count">${CHARACTERS.length} characters loaded</div>
+      </div>
+      <div class="mode-card song" data-mode="song">
+        <div class="tick">MODE // 02</div>
+        <h2>Opening Theme</h2>
+        <p>Hit play, listen to the tune, and name the anime it belongs to before time runs out.</p>
+        <div class="count">${OPENINGS.length} openings loaded</div>
+      </div>
+    </div>
+    <footer>
+      Original character artwork is loaded from Kitsu, with MyAnimeList/Jikan as a backup. Opening audio is streamed from verified AnimeThemes files, with Apple Music previews as a fallback. Internet access is required for media.
+    </footer>
+  `;
+  app.querySelectorAll('.mode-card').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      state.mode = el.dataset.mode;
+      state.view = 'setup';
+      render();
+    });
+  });
+}
+
+function renderSetup(){
+  const isChar = state.mode==='char';
+  app.innerHTML = `
+    <div class="topbar">
+      <div class="logo"><span class="dot"></span> ANIME QUIZ ARCADE</div>
+      <div class="tc">SETUP</div>
+    </div>
+    <button class="back-link">&larr; back to modes</button>
+    <div class="panel">
+      <h3>${isChar ? 'Character ID — Setup' : 'Opening Theme — Setup'}</h3>
+      <div class="field">
+        <label>DIFFICULTY</label>
+        <div class="chip-row" id="diffRow">
+          ${['easy','medium','hard','mixed'].map(d=>`<button class="chip diff-${d} ${state.difficulty===d?'active':''}" data-diff="${d}">${d[0].toUpperCase()+d.slice(1)}</button>`).join('')}
+        </div>
+      </div>
+      <div class="field">
+        <label>QUESTIONS</label>
+        <div class="chip-row" id="countRow">
+          ${[5,10,15].map(c=>`<button class="chip ${state.qCount===c?'active':''}" data-count="${c}">${c}</button>`).join('')}
+        </div>
+      </div>
+      <button class="go-btn ${isChar?'':'song'}" id="startBtn">Start Quiz</button>
+    </div>
+  `;
+  app.querySelector('.back-link').addEventListener('click', ()=>{ state.view='home'; render(); });
+  app.querySelectorAll('#diffRow .chip').forEach(el=>{
+    el.addEventListener('click', ()=>{ state.difficulty = el.dataset.diff; render(); });
+  });
+  app.querySelectorAll('#countRow .chip').forEach(el=>{
+    el.addEventListener('click', ()=>{ state.qCount = parseInt(el.dataset.count); render(); });
+  });
+  app.querySelector('#startBtn').addEventListener('click', startQuiz);
+}
+
+function startQuiz(){
+  stopCurrentAudio();
+  state.questions = buildQuestions(state.mode, state.difficulty, state.qCount);
+  if(state.questions.length===0){ return; }
+  state.qIndex = 0;
+  state.score = 0;
+  state.streak = 0;
+  state.correctCount = 0;
+  state.view = 'quiz';
+  beginQuestion();
+}
+
+function timeLimitFor(){
+  const q = state.questions[state.qIndex];
+  const diff = q.difficulty;
+  return diff==='hard' ? 12 : diff==='medium' ? 16 : 20;
+}
+
+async function beginQuestion(){
+  stopCurrentAudio();
+  const requestId = ++mediaRequestId;
+  state.answered = false;
+  state.hintUsed = false;
+  state.playing = false;
+  state.media = {status:'loading',url:null,source:null,error:null};
+  state.timeLimit = timeLimitFor();
+  state.timeLeft = state.timeLimit;
+  if(state.timer) clearInterval(state.timer);
+  render();
+
+  const q = state.questions[state.qIndex];
+  try{
+    const media = state.mode==='char' ? await loadCharacterMedia(q) : await loadOpeningMedia(q);
+    if(requestId!==mediaRequestId || state.view!=='quiz') return;
+    state.media = {status:'ready',url:media.url,source:media.source,error:null};
+    if(state.mode==='char'){
+      const frame = document.getElementById('avatarFrame');
+      if(frame) frame.innerHTML = `<img src="${media.url}" alt="Mystery anime character">`;
+    }else{
+      currentAudio = media.audio;
+      currentAudio.onplay = ()=>setPlayingUI(true);
+      currentAudio.onpause = ()=>setPlayingUI(false);
+      currentAudio.onended = ()=>setPlayingUI(false);
+      const btn = document.getElementById('playBtn');
+      if(btn) btn.disabled = false;
+    }
+    const status = document.getElementById('mediaStatus');
+    if(status){
+      status.textContent = state.mode==='char' ? 'Character image loaded' : 'Opening loaded — tap play';
+      status.classList.remove('error');
+    }
+  }catch(e){
+    if(requestId!==mediaRequestId || state.view!=='quiz') return;
+    state.media = {status:'error',url:null,source:null,error:e.message};
+    const status = document.getElementById('mediaStatus');
+    if(status){
+      status.textContent = state.mode==='char'
+        ? 'Artwork could not be loaded — showing the backup card.'
+        : 'Opening could not load — tap the retry button.';
+      status.classList.add('error');
+    }
+    if(state.mode==='char'){
+      const frame = document.getElementById('avatarFrame');
+      if(frame) frame.innerHTML = avatarSVG(q.name);
+    }else{
+      const btn = document.getElementById('playBtn');
+      if(btn){
+        btn.disabled = false;
+        btn.innerHTML = '&#8635;';
+        btn.setAttribute('aria-label','Retry opening');
+      }
+      return;
+    }
+  }
+
+  document.querySelectorAll('#optionsRow .opt').forEach(btn=>btn.disabled=false);
+  startQuestionTimer();
+}
+
+function startQuestionTimer(){
+  if(state.timer) clearInterval(state.timer);
+  state.timer = setInterval(()=>{
+    state.timeLeft -= 0.1;
+    if(state.timeLeft<=0){
+      state.timeLeft = 0;
+      clearInterval(state.timer);
+      lockAnswer(null);
+    }
+    updateTimerUI();
+  }, 100);
+}
+
+function updateTimerUI(){
+  const fill = document.getElementById('qProgressFill');
+  const ring = document.getElementById('timerRing');
+  if(!fill||!ring) return;
+  if(state.media.status==='loading'){
+    fill.style.width = '100%';
+    ring.textContent = 'LOADING';
+    ring.classList.remove('low');
+    return;
+  }
+  const pct = Math.max(0, (state.timeLeft/state.timeLimit))*100;
+  fill.style.width = pct+'%';
+  ring.textContent = state.timeLeft.toFixed(1)+'s';
+  ring.classList.toggle('low', state.timeLeft < state.timeLimit*0.25);
+}
+
+function renderQuiz(){
+  const q = state.questions[state.qIndex];
+  const isChar = state.mode==='char';
+  app.innerHTML = `
+    <div class="topbar">
+      <div class="logo"><span class="dot"></span> ANIME QUIZ ARCADE</div>
+      <div class="tc">Q ${state.qIndex+1} / ${state.questions.length}</div>
+    </div>
+    <div class="quiz-head">
+      <div class="stat">SCORE <b>${state.score}</b></div>
+      <div class="stat">STREAK <b>${state.streak}</b></div>
+      <div class="timer-ring" id="timerRing">${state.timeLeft.toFixed(1)}s</div>
+    </div>
+    <div class="progress-bar"><div class="progress-fill ${isChar?'':'song'}" id="qProgressFill" style="width:100%"></div></div>
+
+    <div class="qcard ${isChar?'char':''}">
+      <div class="prompt">${isChar ? 'WHO IS THIS CHARACTER?' : 'WHICH ANIME IS THIS OPENING FROM?'}</div>
+      ${isChar ? renderCharBlock(q) : renderSongBlock(q)}
+      <div class="options" id="optionsRow">
+        ${q.options.map(opt=>`<button class="opt" data-opt="${encodeURIComponent(opt)}" ${state.media.status==='loading'?'disabled':''}>${opt}</button>`).join('')}
+      </div>
+      <div class="feedback" id="feedback"></div>
+    </div>
+  `;
+  updateTimerUI();
+
+  if(isChar){
+    const hintEl = document.getElementById('hintChip');
+    if(hintEl){
+      hintEl.addEventListener('click', ()=>{
+        if(state.hintUsed || state.answered) return;
+        state.hintUsed = true;
+        hintEl.textContent = q.extra;
+        hintEl.classList.add('revealed');
+      });
+    }
+  } else {
+    document.getElementById('playBtn').addEventListener('click', toggleOpeningPlayback);
+  }
+
+  document.querySelectorAll('#optionsRow .opt').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      if(state.answered) return;
+      lockAnswer(decodeURIComponent(btn.dataset.opt));
+    });
+  });
+}
+
+function renderCharBlock(q){
+  return `
+    <div class="avatar-wrap" id="avatarFrame" aria-label="Mystery character image">
+      <span class="media-loader" aria-hidden="true"></span>
+    </div>
+    <div class="media-status" id="mediaStatus">Loading character image…</div>
+    <div><span class="hint-chip" id="hintChip">Reveal hint (-30 pts)</span></div>
+  `;
+}
+function renderSongBlock(q){
+  const bars = Array.from({length:20}).map(()=> `<span style="height:${8+Math.floor(Math.random()*10)}px"></span>`).join('');
+  return `
+    <div class="play-block">
+      <button class="play-btn" id="playBtn" aria-label="Play opening" disabled>&#9658;</button>
+      <div class="waveform" id="waveform">${bars}</div>
+      <div class="media-status" id="mediaStatus">Loading opening audio…</div>
+    </div>
+  `;
+}
+
+function lockAnswer(chosen){
+  if(state.answered) return;
+  state.answered = true;
+  clearInterval(state.timer);
+  stopCurrentAudio();
+  const q = state.questions[state.qIndex];
+  const correct = chosen === q.answer;
+  const feedback = document.getElementById('feedback');
+
+  document.querySelectorAll('#optionsRow .opt').forEach(btn=>{
+    const val = decodeURIComponent(btn.dataset.opt);
+    btn.disabled = true;
+    if(val===q.answer) btn.classList.add('correct');
+    else if(val===chosen) btn.classList.add('wrong');
+    else btn.classList.add('dim');
+  });
+
+  if(correct){
+    state.streak += 1;
+    const timeFrac = Math.max(0, state.timeLeft/state.timeLimit);
+    let pts = Math.round(60 + 40*timeFrac) + state.streak*8;
+    if(state.hintUsed) pts = Math.max(10, pts-30);
+    state.score += pts;
+    state.correctCount += 1;
+    if(feedback){ feedback.textContent = `+${pts} — correct! (${q.answer})`; feedback.className='feedback good'; }
+  } else {
+    state.streak = 0;
+    if(feedback){ feedback.textContent = chosen===null ? `Time's up — it was ${q.answer}` : `Not quite — it was ${q.answer}`; feedback.className='feedback bad'; }
+  }
+
+  setTimeout(()=>{
+    state.qIndex += 1;
+    if(state.qIndex >= state.questions.length){
+      state.view='result';
+      render();
+    } else {
+      beginQuestion();
+    }
+  }, 1400);
+}
+
+function renderResult(){
+  const total = state.questions.length;
+  const acc = Math.round((state.correctCount/total)*100);
+  app.innerHTML = `
+    <div class="topbar">
+      <div class="logo"><span class="dot"></span> ANIME QUIZ ARCADE</div>
+      <div class="tc">RESULTS</div>
+    </div>
+    <div class="result-card">
+      <div class="result-score">${state.score}</div>
+      <div class="result-sub">points · ${state.mode==='char'?'Character ID':'Opening Theme'} · ${state.difficulty}</div>
+      <div class="result-grid">
+        <div><span class="n">${state.correctCount}/${total}</span><span class="l">CORRECT</span></div>
+        <div><span class="n">${acc}%</span><span class="l">ACCURACY</span></div>
+      </div>
+      <div class="result-actions">
+        <button class="go-btn ${state.mode==='char'?'':'song'}" id="againBtn">Play Again</button>
+        <button class="ghost-btn" id="homeBtn">Change Mode</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('againBtn').addEventListener('click', startQuiz);
+  document.getElementById('homeBtn').addEventListener('click', ()=>{ state.view='home'; render(); });
+}
+
+render();
+</script>
+</body>
+</html>
